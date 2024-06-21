@@ -9,8 +9,7 @@ const axios = require('axios')
 app.use(cors())
 app.use(exp.json())
 
-// const db = "mongodb+srv://jsunnybabu:SunnyJakka@drivetogether.kmuu5n1.mongodb.net/"
-const db = "mongodb://127.0.0.1:27017/?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.2.9"
+const db = "mongodb+srv://jakkavignesh2002:VigneshJakka@productpricetracker.6u0wkqb.mongodb.net/"
 mongoose.connect(db).then(()=> {
     console.log("DB connected")
 }).catch(err => {
