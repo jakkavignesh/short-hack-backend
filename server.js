@@ -52,8 +52,16 @@ const postSchema = new mongoose.Schema({
     price: String,
     remainingSeats: Number,
     postingId: Number,
-    email: String
-})
+    email: String,
+    leavingCoords: {
+        type: { type: String, enum: ['Point'], required: true },
+        coordinates: { type: [Number], required: true }
+    },
+    goingCoords: {
+        type: { type: String, enum: ['Point'], required: true },
+        coordinates: { type: [Number], required: true }
+    }
+ });
 
 const bookSchema = new mongoose.Schema({
     leavingFrom: String,
@@ -98,6 +106,7 @@ const sendPostingEmail = async (user) => {
                     <p><strong>Leaving From:</strong> ${user.leavingFrom}</p>
                     <p><strong>Going To:</strong> ${user.goingTo}</p>
                     <p><strong>Date:</strong> ${user.date}</p>
+                    <p><strong>Time:</strong> ${user.time}</p>
                     <p><strong>Car Name:</strong> ${user.carName}</p>
                     <p><strong>Number of Seats:</strong> ${user.numberOfSeats}</p>
                     <p><strong>Price:</strong> ${user.price}</p>
@@ -261,7 +270,6 @@ app.post('/register', async(req, res) => {
     }
 })
 
-
 app.post("/login", async(req, res) => {
     const { email, password } = req.body
     try{
@@ -282,36 +290,74 @@ app.post("/login", async(req, res) => {
     }
 })
 
-app.post("/postride", verifyToken, async(req, res) => {
-    const { leavingFrom, goingTo, date, time, carName, numberOfSeats, price, postingId, email } = req.body
+app.post("/postride", verifyToken, async (req, res) => {
+    const {
+        leavingFrom,
+        goingTo,
+        date,
+        time,
+        carName,
+        numberOfSeats,
+        price,
+        postingId,
+        email,
+        leavingCoords,
+        goingCoords
+    } = req.body;
     const remainingSeats = numberOfSeats;
-    console.log(date)
-    try{
-        const user = new postdatabase({leavingFrom, goingTo, date, time, carName, numberOfSeats, price, remainingSeats, postingId, email});
-        await user.save()
+    try {
+        const user = new postdatabase({
+            leavingFrom,
+            goingTo,
+            date,
+            time,
+            carName,
+            numberOfSeats,
+            price,
+            remainingSeats,
+            postingId,
+            email,
+            leavingCoords: {
+                type: "Point",
+                coordinates: [leavingCoords.lng, leavingCoords.lat]
+            },
+            goingCoords: {
+                type: "Point",
+                coordinates: [goingCoords.lng, goingCoords.lat]
+            }
+        });
+        await user.save();
         await sendPostingEmail(user);
-        res.send({message: "Successfully Posted", status: true, data: user})
+        res.send({ message: "Successfully Posted", status: true, data: user });
+    } catch (err) {
+        console.log(err);
+        res.send({ message: "Error posting ride", status: false });
     }
-    catch (err){
-        console.log(err)
-    }
-})
+ });
 
 app.post("/bookcar", verifyToken, async (req, res) => {
-    const { leavingFrom, goingTo, date, numberOfSeats } = req.body;
-    let cars = await postdatabase.find({ 
+    const { leavingFrom, goingTo, date, time, numberOfSeats, goingCoords } = req.body;
+    // Search for cars within a 10 km radius of the given destination coordinates
+    let cars = await postdatabase.find({
         leavingFrom: leavingFrom,
-        goingTo: goingTo,
+        goingCoords: {
+            $near: {
+                $geometry: {
+                    type: "Point",
+                    coordinates: [goingCoords.lng, goingCoords.lat]
+                },
+                $maxDistance: 10000 // 10 km
+            }
+        },
         date: date,
-    })
-    console.log(cars)
-    if(cars.length === 0) {
-        res.json({ status: false, message: 'No cars available for the specified criteria' });
+    });
+    if (cars.length === 0) {
+        res.send({ status: false, message: 'No cars available for the specified criteria' });
+    } else {
+        res.send({ status: true, message: 'Cars found', data: cars });
     }
-    else {
-        res.status(200).json({ status: true, message: 'Cars found', data: cars });
-    }
-});
+ });
+
 
 app.post("/makeBooking", verifyToken, async (req, res) => {
     const { leavingFrom, goingTo, date, carName, numberOfSeats, price, selectedSeats, postingId, userEmail, userPhone } = req.body;
@@ -344,6 +390,7 @@ app.post("/makeBooking", verifyToken, async (req, res) => {
             leavingFrom: bookedCar.leavingFrom,
             goingTo: bookedCar.goingTo,
             date: bookedCar.date,
+            time: bookedCar.time,
             carName: bookedCar.carName,
             numberOfSeats: selectedSeats,
             price: bookedCar.price,
