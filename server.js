@@ -5,6 +5,7 @@ const mongoose = require('mongoose')
 const nodemailer = require('nodemailer')
 const jwt = require('jsonwebtoken')
 const crypto = require("crypto");
+const axios = require('axios')
 app.use(cors())
 app.use(exp.json())
 
@@ -46,6 +47,7 @@ const postSchema = new mongoose.Schema({
     leavingFrom: String,
     goingTo: String,
     date: String,
+    time: String,
     carName: String,
     numberOfSeats: Number,
     price: String,
@@ -282,10 +284,10 @@ app.post("/login", async(req, res) => {
 })
 
 app.post("/postride", verifyToken, async(req, res) => {
-    const { leavingFrom, goingTo, date, carName, numberOfSeats, price, postingId, email } = req.body
+    const { leavingFrom, goingTo, date, time, carName, numberOfSeats, price, postingId, email } = req.body
     const remainingSeats = numberOfSeats;
     try{
-        const user = new postdatabase({leavingFrom, goingTo, date, carName, numberOfSeats, price, remainingSeats, postingId, email});
+        const user = new postdatabase({leavingFrom, goingTo, date, time, carName, numberOfSeats, price, remainingSeats, postingId, email});
         await user.save()
         await sendPostingEmail(user);
         res.send({message: "Successfully Posted", status: true, data: user})
@@ -421,3 +423,51 @@ app.post('/resetpassword', async (req, res) => {
 app.listen(5001, () => {
     console.log("Server is running on port 5001")
 })
+
+
+
+
+
+
+app.post('/searchroutes', async (req, res) => {
+    const { leavingFrom, goingTo } = req.body;
+    
+    try {
+      // Fetch route using Google Maps Directions API
+      const response = await axios.get('https://maps.googleapis.com/maps/api/directions/json', {
+        params: {
+          origin: leavingFrom,
+          destination: goingTo,
+          key: 'AIzaSyCCNlTAUP5f1QaYg5B0ycI1U00CFlpK4BM',
+        }
+      });
+  
+      const route = response.data.routes[0];
+  
+      if (!route) {
+        return res.send({ status: false, message: 'No route found' });
+      }
+  
+      // Find matching rides from the database
+      const rides = await postdatabase.find({}); // Adjust this query to match your needs
+  
+      // Filter rides to match the path of the route
+      const matchingRides = rides.filter(ride => {
+        // Logic to check if ride.route matches the Google Maps route
+        // This can be complex depending on how you store routes
+        // Simplified example:
+        const rideRoute = ride.route.routes[0];
+        return rideRoute.legs[0].start_address.includes(leavingFrom) && 
+               rideRoute.legs[0].end_address.includes(goingTo);
+      });
+  
+      if (matchingRides.length === 0) {
+        return res.status(404).json({ status: false, message: 'No matching rides found' });
+      }
+  
+      res.json({ status: true, data: matchingRides });
+    } catch (error) {
+      console.error(error);
+      res.send({ status: false, message: 'Internal server error' });
+    }
+  });
