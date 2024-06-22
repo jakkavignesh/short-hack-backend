@@ -9,7 +9,8 @@ const axios = require('axios')
 app.use(cors())
 app.use(exp.json())
 
-const db = "mongodb+srv://jakkavignesh2002:VigneshJakka@productpricetracker.6u0wkqb.mongodb.net/"
+const db = "mongodb+srv://jsunnybabu:SunnyJakka@drivetogether.kmuu5n1.mongodb.net/"
+// const db = "mongodb://127.0.0.1:27017/?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.2.9"
 mongoose.connect(db).then(()=> {
     console.log("DB connected")
 }).catch(err => {
@@ -336,7 +337,6 @@ app.post("/postride", verifyToken, async (req, res) => {
 
 app.post("/bookcar", verifyToken, async (req, res) => {
     const { leavingFrom, goingTo, date, time, numberOfSeats, goingCoords } = req.body;
-    // Search for cars within a 10 km radius of the given destination coordinates
     let cars = await postdatabase.find({
         leavingFrom: leavingFrom,
         goingCoords: {
@@ -345,7 +345,7 @@ app.post("/bookcar", verifyToken, async (req, res) => {
                     type: "Point",
                     coordinates: [goingCoords.lng, goingCoords.lat]
                 },
-                $maxDistance: 10000 // 10 km
+                $maxDistance: 5000 
             }
         },
         date: date,
@@ -356,7 +356,6 @@ app.post("/bookcar", verifyToken, async (req, res) => {
         res.send({ status: true, message: 'Cars found', data: cars });
     }
  });
-
 
 app.post("/makeBooking", verifyToken, async (req, res) => {
     const { leavingFrom, goingTo, date, carName, numberOfSeats, price, selectedSeats, postingId, userEmail, userPhone } = req.body;
